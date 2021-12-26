@@ -1,3 +1,0 @@
-hostname = haokan.baidu.com
-
-https:\/\/haokan\.baidu\.com\/activity\/h5\/vault\?productid=\d url script-request-header https://raw.githubusercontent.com/Sunert/Script/master/Task/baidu_speed.js
