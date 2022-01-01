@@ -1,11 +1,10 @@
 import asyncio
 import os
-import qrcode
 
+import qrcode
 from telethon import TelegramClient, events
 
-from .. import API_HASH, API_ID, BOT, PROXY_START, PROXY_TYPE, connectionType, QR_IMG_FILE, jdbot, chat_id, \
-    CONFIG_DIR
+from .. import API_HASH, API_ID, BOT, PROXY_START, PROXY_TYPE, connectionType, QR_IMG_FILE, jdbot, chat_id, CONFIG_DIR
 
 if BOT.get('proxy_user') and BOT['proxy_user'] != "代理的username,有则填写，无则不用动":
     proxy = {
@@ -33,7 +32,7 @@ else:
 
 
 def creat_qr(text):
-    '''实例化QRCode生成qr对象'''
+    """实例化QRCode生成qr对象"""
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_H,
@@ -53,7 +52,7 @@ def creat_qr(text):
 @jdbot.on(events.NewMessage(from_users=chat_id, pattern=r'^/userlogin$'))
 async def user_login(event):
     try:
-        user.connect()
+        await user.connect()
         qr_login = await user.qr_login()
         creat_qr(qr_login.url)
         await jdbot.send_message(chat_id, '请使用TG扫描二维码以开启USER', file=QR_IMG_FILE)

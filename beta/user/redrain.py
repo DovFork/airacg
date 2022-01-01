@@ -16,9 +16,10 @@ from ..bot.utils import cmd
 from ..diy.utils import my_chat_id
 
 bot_id = int(TOKEN.split(":")[0])
+client = user
 
 
-@user.on(events.NewMessage(chats=[-1001159808620, my_chat_id], pattern=r".*京豆雨.*", outgoing=True))
+@client.on(events.NewMessage(chats=[-1001159808620, my_chat_id], pattern=r".*京豆雨.*"))
 async def red(event):
     """
     龙王庙京豆雨
@@ -43,9 +44,9 @@ async def red(event):
             Time_3 = time.localtime()
             year, mon, mday = Time_3[0], Time_3[1], Time_3[2]
             if int(Time_2[0]) >= 8:
-                await user.send_message(bot_id, cmdtext, schedule=datetime.datetime(year, int(Time_1[1]), int(Time_1[2]), int(Time_2[0]) - 8 , int(Time_2[1]), 0, 0))
+                await client.send_message(bot_id, cmdtext, schedule=datetime.datetime(year, int(Time_1[1]), int(Time_1[2]), int(Time_2[0]) - 8 , int(Time_2[1]), 0, 0))
             else:
-                await user.send_message(bot_id, cmdtext, schedule=datetime.datetime(year, int(Time_1[1]), int(Time_1[2]) - 1, int(Time_2[0]) + 16, int(Time_2[1]), 0, 0))
+                await client.send_message(bot_id, cmdtext, schedule=datetime.datetime(year, int(Time_1[1]), int(Time_1[2]) - 1, int(Time_2[0]) + 16, int(Time_2[1]), 0, 0))
             await jdbot.send_message(chat_id, f'监控到RRA：{RRA}\n预定时间：{Times[i].split("：")[1]}\n\n将在预定时间执行脚本，具体请查看当前机器人的定时任务')
     except Exception as e:
         title = "【💥错误💥】"

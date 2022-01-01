@@ -6,15 +6,19 @@ import asyncio
 import os
 import sys
 
-from .login import user
 from telethon import events
+
+from .login import user
 from .. import chat_id, jdbot, logger, TOKEN
 from ..diy.utils import my_chat_id
 
 bot_id = int(TOKEN.split(":")[0])
 
 
-@user.on(events.NewMessage(chats=[bot_id, my_chat_id], from_users=chat_id, pattern=r"^user(\?|\？)$", outgoing=True))
+client = user
+
+
+@client.on(events.NewMessage(chats=[bot_id, my_chat_id], from_users=chat_id, pattern=r"^user(\?|\？)$"))
 async def user(event):
     try:
         msg = await jdbot.send_message(chat_id, r'`user.py`监控已正常启动！')

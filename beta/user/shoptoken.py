@@ -4,66 +4,139 @@
 
 import os
 import re
-import sys
+import traceback
 
 from telethon import events
 
 from .login import user
-from .. import chat_id, jdbot, logger, TOKEN
-from ..bot.utils import V4, QL
-from ..diy.utils import rwcon
-from ..diy.utils import shoptokenIds
+from .. import chat_id, jdbot, logger
+from ..bot.utils import V4
+from ..diy.utils import rwcon, shoptokenIds
 
-bot_id = int(TOKEN.split(":")[0])
+client = user
 
 
-@user.on(events.NewMessage(chats=shoptokenIds, pattern=r'(export\s)?MyShopToken\d*=(".*"|\'.*\')'))
-async def myshoptoken(event):
+@client.on(events.NewMessage(chats=shoptokenIds, pattern=r'(export\s)?MyShopToken\d*=(".*"|\'.*\')'))
+async def shoptoken(event):
+    """
+    添加删除店铺签到
+    """
     try:
-        messages = event.message.text.split("\n")
-        exports = re.findall(r'export MyShopToken(\d+)="(.*)"', rwcon("str"))
-        change, line, number = "", 0, 1
-        if not exports:
-            msg = await jdbot.send_message(chat_id, '监控到店铺签到环境变量，直接添加！')
+        message = event.message.text
+        if "export" in message:
+            msg = await jdbot.send_message(chat_id, '获取到到MyShopToken变量')
+            name = message.split("=")[0]
+            token = message.split("=")[1]
+            value = re.findall(r'(?<=").*(?=")', token)[0]
             configs = rwcon("str")
-            for message in messages:
-                value = re.findall(r'"([^"]*)"', message)[0]
+            if "export MyShopToken" not in configs:
                 if V4:
-                    configs = rwcon("list")
-                    for config in configs:
-                        if "第五区域" in config and "↑" in config:
-                            line = configs.index(config)
-                            break
-                    change += f'export MyShopToken1="{value}"\n'
-                    configs.insert(line - 2, f'export MyShopToken1="{value}"\n')
-                elif QL:
-                    change += f'export MyShopToken1="{value}"\n'
-                    configs += f'export MyShopToken1="{value}"\n'
-                rwcon(configs)
-            await jdbot.edit_message(msg, f"【店铺签到领京豆】\n\n此次添加的变量\n{change}")
-            return
-        msg = await jdbot.send_message(chat_id, '监控到店铺签到环境变量，继续添加！')
-        for message in messages:
-            value = re.findall(r'"([^"]*)"', message)[0]
-            configs = rwcon("str")
-            if value in configs:
-                continue
-            configs = rwcon("list")
-            for config in configs:
-                if "export MyShopToken" in config:
-                    number = int(re.findall(r'\d+', config.split("=")[0])[0]) + 1
-                    line = configs.index(config) + 1
-            change += f'export MyShopToken{number}="{value}"\n'
-            configs.insert(line, f'export MyShopToken{number}="{value}"\n')
+                    old = re.findall(r'\n## ↑+ 第五区域', configs)[0]
+                    new = '\nexport MyShopToken1=""\n'
+                    configs = re.sub(old, new + old, configs)
+                else:
+                    configs += 'export MyShopToken1=""\n'
+            if "export SHOP_TOKENS" not in configs:
+                if V4:
+                    old = re.findall(r'\n## ↑+ 第五区域', configs)[0]
+                    new = '\nexport SHOP_TOKENS="${MyShopToken1}"\n'
+                    configs = re.sub(old, new + old, configs)
+                else:
+                    configs += 'export SHOP_TOKENS="${MyShopToken1}"\n'
+            config = re.findall(r'export MyShopToken\d+="(.+)"', configs)
+            if len(value) != 32:
+                await jdbot.edit_message(msg, "获取到店铺签到，该变量不正确...")
+                return
+            elif configs.find(value) != -1:
+                await jdbot.edit_message(msg, "获取到店铺签到，该变量已存在...")
+                return
+            elif len(config) >= 20:
+                await jdbot.edit_message(msg, "获取到店铺签到，已满20个店铺变量，不进行新增...")
+            elif len(config) == 0:
+                configs = re.sub('export MyShopToken1=""', f'export MyShopToken1="{value}"', configs)
+                info = f"新增店铺签到完成，当前店铺数量:{len(config)+1}\n"
+                end = f'```{name}="{value}"```'
+                await jdbot.edit_message(msg, info + end)
+            else:
+                i = 0
+                oldtext = ""
+                for index in range(len(config)):
+                    i += 1
+                    oldtext += f'export MyShopToken{i}="{config[int(i) - 1]}"\n'
+                config.insert(0, f'{value}')
+                i = 0
+                newtext = ""
+                for index in range(len(config)):
+                    i += 1
+                    newtext += f'export MyShopToken{i}="{config[int(i) - 1]}"\n'
+                configs = re.sub(oldtext, newtext, configs)
+                if len(config) <= 20:
+                    merge = re.findall(r'export SHOP_TOKENS="(.*)"', configs)[0]
+                    end = f'export SHOP_TOKENS="{merge}&${{MyShopToken{len(config)}}}"'
+                    configs = re.sub(r'export SHOP_TOKENS=".*"', end, configs)
+                info = f"新增店铺签到完成，当前店铺数量:{len(config)}\n"
+                end = f'```{name}="{value}"```'
+                await jdbot.edit_message(msg, info + end)
             rwcon(configs)
-        if len(change) == 0:
-            await jdbot.edit_message(msg, "目前配置中的环境变量无需改动")
-            return
-        await jdbot.edit_message(msg, f"【店铺签到领京豆】\n\n此次添加的变量\n{change}")
+        elif "店铺签到检测" in message:
+            kv = message.replace("\n", "").split("。")
+            chart = []
+            check = []
+            m = -1
+            for _ in kv:
+                m += 1
+                check += re.findall(r"【店铺.*已签到.*", kv[m])
+                chart += re.findall(f"【店铺(\d+)】签到活动已失效", kv[m])
+            n = -1
+            for _ in check:
+                day = []
+                n += 1
+                try:
+                    day += re.findall(f"签到(\d+)天,获得\d+豆；\s\s└已签到：(\d+)天", check[n])[0]
+                except:
+                    continue
+                if int(day[1]) >= int(day[0]):
+                    chart += re.findall(f"【店铺(\d+)】", check[n])
+            charts = sorted(chart,key=int)
+            p = -1
+            for _ in charts:
+                p += 1
+                nums = charts[p]
+                num = int(nums) - p
+                configs = rwcon("str")
+                config = re.findall(r'export MyShopToken\d+="(.+)"', configs)
+                if config:
+                    if len(config) == 1:
+                        configs = re.sub(r'export MyShopToken1=".*"', r'export MyShopToken1=""', configs)
+                        rwcon(configs)
+                        info = f"监测到店铺{nums}签到已结束\n\n已经移除店铺{nums}，当前店铺数量: 0\n"
+                        await jdbot.send_message(chat_id, info)
+                        break
+                    i = 0
+                    oldtext = ""
+                    for index in range(len(config)):
+                        i += 1
+                        oldtext += f'export MyShopToken{i}="{config[int(i) - 1]}"\n'
+                    del config[int(num) - 1]
+                    i = 0
+                    newtext = ""
+                    for index in range(len(config)):
+                        i += 1
+                        newtext += f'export MyShopToken{i}="{config[int(i) - 1]}"\n'
+                    configs = re.sub(oldtext, newtext, configs)
+                    if len(config) < 20:
+                        configs = re.sub('&\${MyShopToken\d+}\"', '"', configs)
+                    rwcon(configs)
+                    info = f"监测到店铺{nums}签到已结束\n\n已经移除店铺{nums}，当前店铺数量:{len(config)}\n"
+                    await jdbot.send_message(chat_id, info)
+                else:
+                    await jdbot.send_message(chat_id, 'config.sh文件内未找到店铺变量')
+                    break
     except Exception as e:
         title = "【💥错误💥】"
         name = "文件名：" + os.path.split(__file__)[-1].split(".")[0]
-        function = "函数名：" + sys._getframe().f_code.co_name
+        function = "函数名：" + e.__traceback__.tb_frame.f_code.co_name
+        details = "错误详情：第 " + str(e.__traceback__.tb_lineno) + " 行"
         tip = '建议百度/谷歌进行查询'
-        await jdbot.send_message(chat_id, f"{title}\n\n{name}\n{function}\n错误原因：{str(e)}\n\n{tip}")
+        await jdbot.send_message(chat_id, f"{title}\n\n{name}\n{function}\n错误原因：{str(e)}\n{details}\n{traceback.format_exc()}\n{tip}")
         logger.error(f"错误--->{str(e)}")
